@@ -1,0 +1,27 @@
+# Node / CDK
+node_modules/
+cdk.out/
+*.js
+!jest.config.js
+*.d.ts
+.cdk.staging/
+cdk.context.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets / local
+*.pem
+*.key
+credentials.json
+.env.local
