@@ -75,7 +75,7 @@ class BedrockClient:
     """Call a Claude Messages API model and return the answer text."""
     body = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 800,
+        "max_tokens": 1024,
         "temperature": 0.2,
         "system": self._system_prompt(),
         "messages": [{"role": "user", "content": [{"type": "text", "text": user_text}]}],
@@ -92,7 +92,7 @@ class BedrockClient:
     body = {
         "system": [{"text": self._system_prompt()}],
         "messages": [{"role": "user", "content": [{"text": user_text}]}],
-        "inferenceConfig": {"maxTokens": 800, "temperature": 0.2},
+        "inferenceConfig": {"maxTokens": 1024, "temperature": 0.2},
     }
     result = self._invoke_json(model_id, body)
     output = result.get("output", {})
