@@ -37,8 +37,8 @@ The primary PoC path is application-layer Bedrock calls plus Aurora pgvector que
 - AWS CDK v2, run through `npx` from the CDK app directory.
 - AWS credentials configured for the target account and region with permissions to deploy VPC, RDS, Secrets Manager, IAM, and CloudFormation resources.
 - Amazon Bedrock model access enabled in the target region for:
-  - Titan Text Embeddings V2.
-  - A Claude model or inference profile that your account can invoke.
+  - Titan Text Embeddings V2 (Amazon-owned, no Marketplace subscription needed).
+  - A generation model. Amazon Nova (for example `eu.amazon.nova-pro-v1:0`) is Amazon-owned and works without an AWS Marketplace subscription. Third-party models such as Anthropic Claude require an AWS Marketplace model subscription, which in many enterprise accounts must be enabled centrally because developer roles lack `aws-marketplace:Subscribe`.
 - Python 3.11 or newer.
 - Application dependencies from `poc/requirements.txt`, including boto3.
 
@@ -62,7 +62,7 @@ After deployment, copy the CloudFormation outputs:
 
 ## Configure
 
-Choose a Bedrock generation model ID or inference profile that your account can access. The exact Claude model ID varies by region and account model access. In several regions, including `eu-central-1` (Frankfurt), on-demand Claude requires a cross-region inference profile rather than the bare model ID. In that case set `GEN_MODEL_ID` to the profile ID, for example `eu.anthropic.claude-3-5-sonnet-20240620-v1:0`.
+Choose a Bedrock generation model that your account can invoke. Amazon Nova is the default and recommended choice because it is Amazon-owned and needs no AWS Marketplace subscription. In `eu-central-1` (Frankfurt) use the cross-region inference profile `eu.amazon.nova-pro-v1:0` (or `eu.amazon.nova-lite-v1:0` for lower cost). To use Anthropic Claude instead, set `GEN_MODEL_ID` to an accessible Claude profile such as `eu.anthropic.claude-sonnet-4-5-20250929-v1:0`, but note that Claude requires an AWS Marketplace model subscription enabled for the account. The application auto-detects Nova versus Claude from the model ID and sends the matching request schema.
 
 ```bash
 export AWS_REGION="<Region output>"
@@ -70,7 +70,7 @@ export DB_CLUSTER_ARN="<ClusterArn output>"
 export DB_SECRET_ARN="<SecretArn output>"
 export DB_NAME="ragdemo"
 export EMBED_MODEL_ID="amazon.titan-embed-text-v2:0"
-export GEN_MODEL_ID="<your Claude Bedrock model ID or inference profile>"
+export GEN_MODEL_ID="eu.amazon.nova-pro-v1:0"
 export VECTOR_DIM="1024"
 ```
 

@@ -47,39 +47,61 @@ class BedrockClient:
       raise ValueError(f"Expected embedding dimension {self.settings.vector_dim}, got {len(embedding)}")
     return [float(value) for value in embedding]
 
-  def generate(self, prompt: str, context: str = "") -> str:
-    """Generate an answer with a Claude Messages API model on Bedrock."""
-    system_prompt = (
+  @staticmethod
+  def _is_nova_model(model_id: str) -> bool:
+    """Return True for Amazon Nova models, which use a different request schema."""
+    return "amazon.nova" in model_id or ".nova-" in model_id
+
+  def _system_prompt(self) -> str:
+    return (
         "You are a concise AWS RAG assistant. Answer only from the provided context. "
         "If the context does not contain the answer, say that the corpus does not provide enough information. "
         "Cite sources using bracketed source numbers such as [1]."
     )
+
+  def generate(self, prompt: str, context: str = "") -> str:
+    """Generate an answer with a Claude or Amazon Nova model on Bedrock."""
     user_text = prompt if not context else f"Context:\n{context}\n\nQuestion and instructions:\n{prompt}"
+    model_id = self.settings.gen_model_id
+    if self._is_nova_model(model_id):
+      answer = self._generate_nova(model_id, user_text)
+    else:
+      answer = self._generate_claude(model_id, user_text)
+    if answer:
+      return answer
+    raise ValueError("Bedrock generation response did not contain text content")
+
+  def _generate_claude(self, model_id: str, user_text: str) -> str:
+    """Call a Claude Messages API model and return the answer text."""
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 800,
         "temperature": 0.2,
-        "system": system_prompt,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": user_text,
-                    }
-                ],
-            }
-        ],
+        "system": self._system_prompt(),
+        "messages": [{"role": "user", "content": [{"type": "text", "text": user_text}]}],
     }
-    result = self._invoke_json(self.settings.gen_model_id, body)
+    result = self._invoke_json(model_id, body)
     content = result.get("content", [])
     if isinstance(content, list):
-      text_blocks = [block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"]
-      answer = "".join(text_blocks).strip()
-      if answer:
-        return answer
-    raise ValueError("Bedrock generation response did not contain text content")
+      blocks = [block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"]
+      return "".join(blocks).strip()
+    return ""
+
+  def _generate_nova(self, model_id: str, user_text: str) -> str:
+    """Call an Amazon Nova model and return the answer text."""
+    body = {
+        "system": [{"text": self._system_prompt()}],
+        "messages": [{"role": "user", "content": [{"text": user_text}]}],
+        "inferenceConfig": {"maxTokens": 800, "temperature": 0.2},
+    }
+    result = self._invoke_json(model_id, body)
+    output = result.get("output", {})
+    message = output.get("message", {}) if isinstance(output, dict) else {}
+    content = message.get("content", []) if isinstance(message, dict) else []
+    if isinstance(content, list):
+      blocks = [block.get("text", "") for block in content if isinstance(block, dict)]
+      return "".join(blocks).strip()
+    return ""
 
 
 _default_client: BedrockClient | None = None

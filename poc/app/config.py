@@ -8,11 +8,13 @@ Required environment variables:
 Optional environment variables:
 - DB_NAME, defaults to ragdemo
 - EMBED_MODEL_ID, defaults to amazon.titan-embed-text-v2:0
-- GEN_MODEL_ID, defaults to anthropic.claude-3-5-sonnet-20240620-v1:0
+- GEN_MODEL_ID, defaults to eu.amazon.nova-pro-v1:0
 - VECTOR_DIM, defaults to 1024
 
-GEN_MODEL_ID must be a Claude-on-Bedrock model ID or inference profile that your
-AWS account can access in AWS_REGION.
+GEN_MODEL_ID must be a Claude or Amazon Nova model ID or inference profile that your
+AWS account can access in AWS_REGION. Amazon Nova is an Amazon-owned model and does
+not require an AWS Marketplace model subscription, so it avoids the Marketplace
+subscribe permissions that third-party models such as Anthropic Claude require.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ import os
 
 DEFAULT_DB_NAME = "ragdemo"
 DEFAULT_EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
-DEFAULT_GEN_MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+DEFAULT_GEN_MODEL_ID = "eu.amazon.nova-pro-v1:0"
 DEFAULT_VECTOR_DIM = 1024
 SUPPORTED_TITAN_V2_DIMS = {256, 512, 1024}
 

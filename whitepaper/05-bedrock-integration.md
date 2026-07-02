@@ -100,3 +100,14 @@ Sie ist weniger geeignet, wenn Retrieval selbst ein differenzierender Kern des P
 | Best-fit | Backfills, einfache SQL-nahe Embeddings | PoC Default und produktionsnahe App | Managed RAG mit wenig Custom Logic |
 
 Die PoC-Empfehlung ist klar: **Application-layer RAG**. Dieser Pfad ist robust genug für Enterprise Engineering, vermeidet eine Überkopplung der Datenbank an Modellaufrufe und lässt spätere Vector-Store-Entscheidungen offen. In-database inference ist ein nützliches Spezialwerkzeug. Bedrock Knowledge Bases ist ein ernstzunehmender Managed-Pfad, wenn Geschwindigkeit und Standardisierung wichtiger sind als volle Retrieval-Kontrolle.
+
+## Modellzugriff und Governance (Praxisfund)
+
+Ein produktionsrelevanter Punkt, der in vielen Architekturdiskussionen fehlt, ist die **Modellfreischaltung selbst**. Bedrock unterscheidet zwei Klassen von Foundation Models:
+
+- **Amazon-eigene Modelle** (zum Beispiel Titan Text Embeddings V2 und Amazon Nova). Diese benötigen keine AWS-Marketplace-Subscription und sind in der Regel sofort aufrufbar, sobald der Modellzugriff in der Region freigeschaltet ist.
+- **Drittanbietermodelle** (zum Beispiel Anthropic Claude). Diese sind AWS-Marketplace-Produkte. Ein `InvokeModel`-Aufruf ohne bestehende Subscription scheitert mit `AccessDeniedException` und dem Hinweis auf fehlende `aws-marketplace:ViewSubscriptions` und `aws-marketplace:Subscribe`.
+
+In Enterprise-Accounts mit zentralem Landing-Zone- oder SSO-Modell haben Entwicklerrollen diese Marketplace-Rechte oft **nicht**. Der Modellzugriff muss dann zentral durch ein Plattform- oder Cloud-Foundation-Team etabliert werden. Cross-Region-Inference-Profile (Präfix `eu.`) verschärfen das: Der Zugriff muss in **allen** Regionen des Profils bestehen, sonst treten intermittierende `AccessDenied`-Fehler auf, je nachdem, in welche Region ein einzelner Aufruf geroutet wird.
+
+Konsequenz für Data Engineering: Für schnelle, unabhängige PoCs und Demos sind Amazon-eigene Modelle (Nova zur Generierung, Titan zur Einbettung) die reibungsärmste Wahl. Der Wechsel zu Claude oder anderen Drittanbietermodellen sollte als eigener, geplanter Governance-Schritt behandelt werden, inklusive Marketplace-Subscription und regionaler Freischaltung. Die Anwendung sollte modellfamilienunabhängig gebaut sein: Der PoC erkennt automatisch Nova gegenüber Claude anhand der Model-ID und sendet das jeweils passende Request-Schema.
