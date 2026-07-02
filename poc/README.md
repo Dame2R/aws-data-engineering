@@ -62,7 +62,7 @@ After deployment, copy the CloudFormation outputs:
 
 ## Configure
 
-Choose a Bedrock generation model ID or inference profile that your account can access. The exact Claude model ID varies by region and account model access.
+Choose a Bedrock generation model ID or inference profile that your account can access. The exact Claude model ID varies by region and account model access. In several regions, including `eu-central-1` (Frankfurt), on-demand Claude requires a cross-region inference profile rather than the bare model ID. In that case set `GEN_MODEL_ID` to the profile ID, for example `eu.anthropic.claude-3-5-sonnet-20240620-v1:0`.
 
 ```bash
 export AWS_REGION="<Region output>"
@@ -72,6 +72,45 @@ export DB_NAME="ragdemo"
 export EMBED_MODEL_ID="amazon.titan-embed-text-v2:0"
 export GEN_MODEL_ID="<your Claude Bedrock model ID or inference profile>"
 export VECTOR_DIM="1024"
+```
+
+## Caller IAM permissions
+
+The application runs on your machine and calls AWS with your local credentials (for example `AWS_PROFILE` or environment credentials). That identity, not the CDK deploy role, needs runtime permissions:
+
+- `rds-data:ExecuteStatement` on the cluster ARN.
+- `secretsmanager:GetSecretValue` on the cluster master secret ARN.
+- `bedrock:InvokeModel` on the embedding and generation models or inference profiles.
+
+If your local identity is already an administrator you can skip the policy below. Otherwise attach a least-privilege policy and replace the ARNs, region, and account ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DataApi",
+      "Effect": "Allow",
+      "Action": "rds-data:ExecuteStatement",
+      "Resource": "<ClusterArn output>"
+    },
+    {
+      "Sid": "ReadDbSecret",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "<SecretArn output>"
+    },
+    {
+      "Sid": "InvokeBedrock",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": [
+        "arn:aws:bedrock:<region>::foundation-model/amazon.titan-embed-text-v2:0",
+        "arn:aws:bedrock:<region>:<account-id>:inference-profile/eu.anthropic.claude-3-5-sonnet-20240620-v1:0"
+      ]
+    }
+  ]
+}
 ```
 
 ## Install app dependencies
@@ -103,6 +142,14 @@ python poc/app/query.py "How does Aurora Serverless v2 scale to zero?"
 ```
 
 The script is expected to embed the question, retrieve similar chunks from Aurora pgvector, and call the configured Bedrock generation model.
+
+Run `query.py` without an argument to start an interactive chat loop, which is convenient for a live demo recording:
+
+```bash
+python poc/app/query.py
+```
+
+The Aurora Serverless v2 minimum capacity is 0 ACU, so the cluster pauses when idle. The first `ingest.py` or `query.py` run after a pause can take a few extra seconds while the cluster resumes. The Data API client retries `DatabaseResumingException` automatically, so no manual action is needed.
 
 ## Teardown
 

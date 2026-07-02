@@ -11,14 +11,20 @@ from decimal import Decimal
 import json
 import math
 from pathlib import Path
+import time
 from typing import Any, Iterable
 
 import boto3
+from botocore.exceptions import ClientError
 
 from app.config import Settings, load_settings
 
 POC_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = POC_DIR / "sql" / "schema.sql"
+
+RESUME_RETRYABLE_ERROR_CODES = frozenset({"DatabaseResumingException"})
+RESUME_MAX_ATTEMPTS = 12
+RESUME_RETRY_DELAY_SECONDS = 3.0
 
 
 def vector_to_literal(values: Iterable[float]) -> str:
@@ -205,8 +211,26 @@ class DataApiClient:
     if format_records_as:
       request["formatRecordsAs"] = format_records_as
 
-    response = self.client.execute_statement(**request)
+    response = self._call_with_resume_retry(request)
     return _parse_records(response)
+
+  def _call_with_resume_retry(self, request: dict[str, Any]) -> dict[str, Any]:
+    """Call the Data API, retrying while a scaled-to-zero cluster resumes.
+
+    With a minimum capacity of 0 ACU the Aurora Serverless v2 cluster pauses when
+    idle. The first Data API call after an idle period can raise
+    DatabaseResumingException while the cluster wakes up. Retry briefly instead of
+    failing the ingest or query run.
+    """
+    for attempt in range(1, RESUME_MAX_ATTEMPTS + 1):
+      try:
+        return self.client.execute_statement(**request)
+      except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "")
+        if code not in RESUME_RETRYABLE_ERROR_CODES or attempt == RESUME_MAX_ATTEMPTS:
+          raise
+        time.sleep(RESUME_RETRY_DELAY_SECONDS)
+    raise RuntimeError("Data API call exhausted resume retries without a response")
 
   def execute_script(self, sql_text: str) -> None:
     """Execute a semicolon-delimited SQL script statement by statement."""
